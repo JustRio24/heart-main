@@ -19,7 +19,7 @@ export default function TextHeart() {
 
     let animationFrameId: number;
     let points: Point[] = [];
-    const text = "UCUP";
+    const text = "Princess DEA";
     const fontSize = 14;
 
     const resize = () => {
