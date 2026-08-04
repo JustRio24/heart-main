@@ -1,7 +1,8 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Terminal, Lock, Heart as HeartIcon, Sparkles } from 'lucide-react';
 import TextHeart from './components/TextHeart';
+import bgMusic from './music/bg_music.mp3';
 
 const Typewriter = ({ text, delay = 50, onComplete }: { text: string, delay?: number, onComplete?: () => void }) => {
   const [currentText, setCurrentText] = useState("");
@@ -25,18 +26,32 @@ const Typewriter = ({ text, delay = 50, onComplete }: { text: string, delay?: nu
 export default function App() {
   const [stage, setStage] = useState<'console' | 'reveal'>('console');
   const [consoleFinished, setConsoleFinished] = useState(false);
+  const audioRef = useRef<HTMLAudioElement>(null);
 
   const handleReveal = useCallback(() => {
     if (stage === 'console' && consoleFinished) {
       setStage('reveal');
+      if (audioRef.current) {
+        audioRef.current.play().catch(console.error);
+      }
     }
   }, [stage, consoleFinished]);
+
+  const handleReEncrypt = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+    setStage('console');
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.currentTime = 0;
+    }
+  }, []);
 
   return (
     <div 
       onClick={handleReveal}
       className={`relative min-h-screen w-full flex items-center justify-center bg-[#050505] selection:bg-pink-deep/30 ${stage === 'console' && consoleFinished ? 'cursor-pointer' : ''}`}
     >
+      <audio ref={audioRef} src={bgMusic} loop />
       <div className="scanline" />
       
       <AnimatePresence mode="wait">
@@ -85,7 +100,7 @@ export default function App() {
                     id="decrypt-button"
                     onClick={(e) => {
                       e.stopPropagation();
-                      setStage('reveal');
+                      handleReveal();
                     }}
                     className="group flex items-center gap-3 px-6 py-3 border border-pink-deep/30 bg-pink-deep/5 hover:bg-pink-deep/10 text-pink-soft transition-all duration-300 pointer-events-auto"
                   >
@@ -122,10 +137,7 @@ export default function App() {
               <div className="w-12 h-px bg-pink-deep/30 mx-auto mb-8" />
               
               <motion.button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setStage('console');
-                }}
+                onClick={handleReEncrypt}
                 className="text-white/20 hover:text-white/60 transition-colors uppercase text-[10px] tracking-widest font-mono"
               >
                 Re-encrypt
