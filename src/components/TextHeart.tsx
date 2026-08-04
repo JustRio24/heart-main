@@ -10,7 +10,7 @@ interface Point {
   colorOffset: number;
 }
 
-const words = ["Princess DEA", "I Love You", "Beautiful", "My Everything", "Forever"];
+const words = ["Princess DEA", "I Love You", "Beautiful", "My Everything", "Fav Person"];
 
 export default function TextHeart() {
   const canvasRef = useRef<HTMLCanvasElement>(null);

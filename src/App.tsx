@@ -226,7 +226,7 @@ export default function App() {
               className="z-20 text-center"
               style={{ transform: `translate(${parallaxX}px, ${parallaxY}px)` }}
             >
-              <div className="mb-4 min-h-[4rem] text-pink-soft max-w-md mx-auto text-sm md:text-base leading-relaxed drop-shadow-lg">
+              <div className="mb-4 min-h-[4rem] text-pink-soft max-w-md mx-auto text-sm md:text-base leading-relaxed drop-shadow-lg bg-black/40">
                 <Typewriter 
                     text={"Dear Princess DEA,\nYou are the most beautiful part of my code.\nMy universe revolves around you."}
                     delay={60}
@@ -234,7 +234,7 @@ export default function App() {
                 />
               </div>
               
-              <h2 className="text-pink-deep font-mono text-xl tracking-[0.3em] uppercase glow-text mb-4 mt-8">
+              <h2 className="text-pink-deep font-mono text-xl tracking-[0.3em] uppercase glow-text mb-4 mt-8 bg-black/25">
                 Decrypted
               </h2>
               <div className="w-12 h-px bg-pink-deep/30 mx-auto mb-8" />
