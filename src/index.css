@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500&family=Inter:wght@400;600&family=Playfair+Display:ital,wght@1,300;1,600&family=Space+Grotesk:wght@300;500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600&family=Inter:wght@400;500;600&family=Space+Grotesk:wght@300;500;600&display=swap');
 @import "tailwindcss";
 
 @theme {
@@ -13,7 +13,21 @@
 
 @layer base {
   body {
-    @apply bg-[#050505] text-white selection:bg-brand-red/30;
+    @apply bg-[#050505] text-white selection:bg-pink-deep/30;
+    overflow-x: hidden;
+  }
+}
+
+/* Cursor handling: Only hide native cursor on desktop with fine mouse pointer */
+@media (hover: hover) and (pointer: fine) {
+  * {
+    cursor: none !important;
+  }
+}
+
+@media (hover: none) or (pointer: coarse) {
+  .custom-cursor {
+    display: none !important;
   }
 }
 
@@ -28,23 +42,19 @@
 }
 
 .glow-text {
-  text-shadow: 0 0 10px rgba(255, 77, 109, 0.5), 0 0 20px rgba(255, 77, 109, 0.3);
+  text-shadow: 0 0 10px rgba(255, 77, 109, 0.6), 0 0 25px rgba(255, 77, 109, 0.4);
   animation: breathe 3s ease-in-out infinite alternate;
 }
 
 @keyframes breathe {
   from {
-    text-shadow: 0 0 10px rgba(255, 77, 109, 0.3), 0 0 20px rgba(255, 77, 109, 0.2);
+    text-shadow: 0 0 10px rgba(255, 77, 109, 0.4), 0 0 20px rgba(255, 77, 109, 0.2);
     transform: scale(1);
   }
   to {
-    text-shadow: 0 0 15px rgba(255, 77, 109, 0.8), 0 0 30px rgba(255, 77, 109, 0.6), 0 0 40px rgba(255, 77, 109, 0.4);
+    text-shadow: 0 0 18px rgba(255, 77, 109, 0.9), 0 0 35px rgba(255, 77, 109, 0.6), 0 0 50px rgba(255, 0, 60, 0.3);
     transform: scale(1.02);
   }
-}
-
-* {
-  cursor: none !important;
 }
 
 .custom-cursor {
@@ -80,7 +90,7 @@
   height: 12px;
   background: #ff4d6d;
   border-radius: 50%;
-  box-shadow: 0 0 10px #ff4d6d, 0 0 20px #ff4d6d;
+  box-shadow: 0 0 12px #ff4d6d, 0 0 24px #ff003c;
   mix-blend-mode: screen;
 }
 
@@ -98,4 +108,19 @@
 @keyframes scanline {
   0% { bottom: 100%; }
   100% { bottom: -100px; }
+}
+
+@keyframes ambient-pulse {
+  0%, 100% {
+    opacity: 0.35;
+    transform: scale(0.98);
+  }
+  50% {
+    opacity: 0.65;
+    transform: scale(1.05);
+  }
+}
+
+.ambient-aura {
+  animation: ambient-pulse 4s ease-in-out infinite;
 }
