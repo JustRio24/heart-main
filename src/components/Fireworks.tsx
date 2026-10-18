@@ -3,13 +3,15 @@ import React, { useEffect, useRef } from 'react';
 /**
  * Fireworks — canvas particle engine for the heart site background.
  *
- * - Rockets launch from the bottom and explode into glowing sparks
- * - Occasional heart-shaped bursts (matches the theme)
- * - Click / tap anywhere launches a rocket toward that point
- * - Respects prefers-reduced-motion and pauses when the tab is hidden
+ * Rendering notes (why it looks the way it does):
+ * - Trails come from fading the previous frame with `destination-out`, not from
+ *   clearRect. That keeps the canvas transparent (the page background shows
+ *   through) while leaving glowing streaks behind every spark.
+ * - Sparks are stroked with a `shadowBlur` halo so they read as light, not dots.
+ * - Intensity scales burst size + launch rate; `off` stops all emission.
  */
 
-type Intensity = 'low' | 'high' | 'off';
+type Intensity = 'low' | 'medium' | 'high' | 'off';
 
 interface FireworksProps {
   intensity?: Intensity;
@@ -26,7 +28,6 @@ interface Rocket {
   hue: number;
   heart: boolean;
   trail: { x: number; y: number }[];
-  dead: boolean;
 }
 
 interface Spark {
@@ -45,7 +46,16 @@ interface Spark {
   glitter: boolean;
 }
 
-const PALETTE = [345, 330, 355, 300, 285, 40, 0, 190];
+interface Flash {
+  x: number;
+  y: number;
+  hue: number;
+  life: number;
+  maxLife: number;
+  radius: number;
+}
+
+const PALETTE = [345, 332, 352, 300, 285, 45, 0, 195, 320];
 
 const rand = (min: number, max: number) => min + Math.random() * (max - min);
 const pick = <T,>(arr: T[]): T => arr[Math.floor(Math.random() * arr.length)];
@@ -57,10 +67,38 @@ function heartPoint(t: number): { x: number; y: number } {
   return { x: x / 17, y: y / 17 };
 }
 
+const TUNING = {
+  low: {
+    sparks: [70, 105] as [number, number],
+    speed: [2.6, 5.2] as [number, number],
+    life: [55, 95] as [number, number],
+    every: [1100, 2100] as [number, number],
+    size: [1.6, 3.0] as [number, number],
+    heartChance: 0.15,
+  },
+  medium: {
+    sparks: [110, 160] as [number, number],
+    speed: [3.2, 6.4] as [number, number],
+    life: [60, 110] as [number, number],
+    every: [750, 1500] as [number, number],
+    size: [1.8, 3.4] as [number, number],
+    heartChance: 0.22,
+  },
+  high: {
+    sparks: [160, 230] as [number, number],
+    speed: [3.6, 7.2] as [number, number],
+    life: [65, 120] as [number, number],
+    every: [420, 950] as [number, number],
+    size: [2.0, 3.8] as [number, number],
+    heartChance: 0.3,
+  },
+};
+
+type TuningKey = keyof typeof TUNING;
+
 export default function Fireworks({ intensity = 'high', finaleSignal = 0 }: FireworksProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const intensityRef = useRef<Intensity>(intensity);
-  const finaleRef = useRef(finaleSignal);
   const launchRef = useRef<((x?: number, y?: number) => void) | null>(null);
 
   useEffect(() => {
@@ -68,17 +106,12 @@ export default function Fireworks({ intensity = 'high', finaleSignal = 0 }: Fire
   }, [intensity]);
 
   useEffect(() => {
-    finaleRef.current = finaleSignal;
-    if (finaleSignal > 0 && launchRef.current) {
-      // Celebratory finale: a rapid volley of bursts across the sky.
-      const timers: number[] = [];
-      for (let i = 0; i < 10; i++) {
-        timers.push(
-          window.setTimeout(() => launchRef.current?.(), 90 * i + Math.random() * 120)
-        );
-      }
-      return () => timers.forEach((t) => window.clearTimeout(t));
+    if (finaleSignal <= 0) return;
+    const timers: number[] = [];
+    for (let i = 0; i < 14; i++) {
+      timers.push(window.setTimeout(() => launchRef.current?.(), 80 * i + Math.random() * 90));
     }
+    return () => timers.forEach((t) => window.clearTimeout(t));
   }, [finaleSignal]);
 
   useEffect(() => {
@@ -99,8 +132,11 @@ export default function Fireworks({ intensity = 'high', finaleSignal = 0 }: Fire
 
     const rockets: Rocket[] = [];
     const sparks: Spark[] = [];
+    const flashes: Flash[] = [];
+    const MAX_SPARKS = 2200;
 
-    const MAX_SPARKS = 1400;
+    const tune = (): (typeof TUNING)[TuningKey] =>
+      TUNING[(intensityRef.current === 'off' ? 'medium' : intensityRef.current) as TuningKey];
 
     const resize = () => {
       width = window.innerWidth;
@@ -111,13 +147,16 @@ export default function Fireworks({ intensity = 'high', finaleSignal = 0 }: Fire
       canvas.style.width = `${width}px`;
       canvas.style.height = `${height}px`;
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.clearRect(0, 0, width, height);
     };
 
     const spawnSparks = (x: number, y: number, hue: number, heart: boolean) => {
-      const high = intensityRef.current === 'high';
-      const count = high ? Math.floor(rand(90, 140)) : Math.floor(rand(45, 75));
-      const speed = high ? rand(2.2, 5.4) : rand(1.6, 3.6);
-      const baseLife = high ? rand(55, 100) : rand(40, 75);
+      const t = tune();
+      const count = Math.floor(rand(t.sparks[0], t.sparks[1]));
+      const speed = rand(t.speed[0], t.speed[1]);
+      const baseLife = rand(t.life[0], t.life[1]);
+
+      flashes.push({ x, y, hue, life: 14, maxLife: 14, radius: rand(60, 110) });
 
       for (let i = 0; i < count; i++) {
         if (sparks.length >= MAX_SPARKS) break;
@@ -126,10 +165,10 @@ export default function Fireworks({ intensity = 'high', finaleSignal = 0 }: Fire
         let vy: number;
 
         if (heart) {
-          // Even spacing around the heart curve gives a recognizable outline.
-          const t = (i / count) * Math.PI * 2;
-          const p = heartPoint(t);
-          const jitter = rand(0.86, 1.14);
+          // Even spacing around the heart curve keeps the silhouette readable.
+          const ang = (i / count) * Math.PI * 2;
+          const p = heartPoint(ang);
+          const jitter = rand(0.9, 1.1);
           vx = p.x * speed * jitter;
           vy = p.y * speed * jitter;
         } else {
@@ -146,24 +185,24 @@ export default function Fireworks({ intensity = 'high', finaleSignal = 0 }: Fire
           py: y,
           vx,
           vy,
-          life: baseLife * rand(0.75, 1.15),
+          life: baseLife * rand(0.8, 1.2),
           maxLife: baseLife,
-          hue: hue + rand(-16, 16),
-          size: rand(1.1, 2.4),
-          drag: rand(0.975, 0.988),
-          gravity: rand(0.035, 0.075),
-          glitter: Math.random() < 0.28,
+          hue: hue + rand(-18, 18),
+          size: rand(t.size[0], t.size[1]),
+          drag: rand(0.972, 0.986),
+          gravity: rand(0.04, 0.085),
+          glitter: Math.random() < 0.3,
         });
       }
     };
 
     const launch = (targetX?: number, targetY?: number) => {
-      if (rockets.length > 8) return;
+      if (rockets.length > 12) return;
 
-      const high = intensityRef.current === 'high';
-      const startX = targetX !== undefined ? targetX + rand(-40, 40) : rand(width * 0.12, width * 0.88);
-      const destY = targetY !== undefined ? targetY : rand(height * 0.12, height * 0.48);
-      const frames = rand(42, 68);
+      const t = tune();
+      const startX = targetX !== undefined ? targetX + rand(-30, 30) : rand(width * 0.08, width * 0.92);
+      const destY = targetY !== undefined ? targetY : rand(height * 0.1, height * 0.5);
+      const frames = rand(38, 60);
       const startY = height + 10;
 
       rockets.push({
@@ -173,58 +212,79 @@ export default function Fireworks({ intensity = 'high', finaleSignal = 0 }: Fire
         vy: (destY - startY) / frames,
         targetY: destY,
         hue: pick(PALETTE),
-        heart: high ? Math.random() < 0.28 : Math.random() < 0.12,
+        heart: Math.random() < t.heartChance,
         trail: [],
-        dead: false,
       });
     };
 
     let lastAuto = 0;
-    let nextAuto = rand(500, 1200);
+    let nextAuto = 350;
 
     launchRef.current = launch;
 
-    const draw = (time: number) => {
-      ctx.clearRect(0, 0, width, height);
+    const draw = () => {
+      // Fade the previous frame instead of clearing it: transparent canvas plus
+      // long glowing trails. 0.19 leaves a ~0.5s tail at 60fps.
+      ctx.globalCompositeOperation = 'destination-out';
+      ctx.fillStyle = 'rgba(0,0,0,0.19)';
+      ctx.fillRect(0, 0, width, height);
+      ctx.globalCompositeOperation = 'lighter';
 
-      // User can switch the effect off at runtime; keep the loop cheap.
       if (intensityRef.current === 'off') {
         rockets.length = 0;
         sparks.length = 0;
+        flashes.length = 0;
+        ctx.globalCompositeOperation = 'source-over';
         raf = requestAnimationFrame(draw);
         return;
       }
 
-      ctx.globalCompositeOperation = 'lighter';
+      // ---- explosion flashes ----
+      for (let i = flashes.length - 1; i >= 0; i--) {
+        const f = flashes[i];
+        f.life -= 1;
+        if (f.life <= 0) {
+          flashes.splice(i, 1);
+          continue;
+        }
+        const k = f.life / f.maxLife;
+        const r = f.radius * (1.6 - k);
+        const grad = ctx.createRadialGradient(f.x, f.y, 0, f.x, f.y, r);
+        grad.addColorStop(0, `hsla(${f.hue}, 100%, 88%, ${0.5 * k})`);
+        grad.addColorStop(0.4, `hsla(${f.hue}, 100%, 65%, ${0.16 * k})`);
+        grad.addColorStop(1, 'hsla(0, 0%, 0%, 0)');
+        ctx.fillStyle = grad;
+        ctx.beginPath();
+        ctx.arc(f.x, f.y, r, 0, Math.PI * 2);
+        ctx.fill();
+      }
 
       // ---- rockets ----
       for (let i = rockets.length - 1; i >= 0; i--) {
         const r = rockets[i];
 
         r.trail.push({ x: r.x, y: r.y });
-        if (r.trail.length > 7) r.trail.shift();
+        if (r.trail.length > 10) r.trail.shift();
 
         r.x += r.vx;
         r.y += r.vy;
-        r.vy += 0.028; // gentle arc
+        r.vy += 0.03; // gentle arc
         r.vx *= 0.995;
 
-        // Trail
         for (let t = 0; t < r.trail.length; t++) {
           const p = r.trail[t];
-          const a = (t / r.trail.length) * 0.55;
-          ctx.fillStyle = `hsla(${r.hue}, 100%, 75%, ${a})`;
+          const a = (t / r.trail.length) * 0.8;
+          ctx.fillStyle = `hsla(${r.hue}, 100%, 78%, ${a})`;
           ctx.beginPath();
-          ctx.arc(p.x, p.y, 1.6, 0, Math.PI * 2);
+          ctx.arc(p.x, p.y, 2.2, 0, Math.PI * 2);
           ctx.fill();
         }
 
-        // Head
-        ctx.fillStyle = `hsla(${r.hue}, 100%, 88%, 0.95)`;
-        ctx.shadowColor = `hsla(${r.hue}, 100%, 70%, 0.9)`;
-        ctx.shadowBlur = 14;
+        ctx.fillStyle = `hsla(${r.hue}, 100%, 92%, 1)`;
+        ctx.shadowColor = `hsla(${r.hue}, 100%, 70%, 1)`;
+        ctx.shadowBlur = 18;
         ctx.beginPath();
-        ctx.arc(r.x, r.y, 2.1, 0, Math.PI * 2);
+        ctx.arc(r.x, r.y, 2.6, 0, Math.PI * 2);
         ctx.fill();
         ctx.shadowBlur = 0;
 
@@ -252,19 +312,22 @@ export default function Fireworks({ intensity = 'high', finaleSignal = 0 }: Fire
         }
 
         const lifeRatio = s.life / s.maxLife;
-        const alpha = Math.min(1, lifeRatio * 1.35);
-        const flicker = s.glitter && Math.random() < 0.35 ? 0.25 : 1;
+        const alpha = Math.min(1, lifeRatio * 1.6);
+        const flicker = s.glitter && Math.random() < 0.3 ? 0.3 : 1;
         const a = alpha * flicker;
+        const light = 70 + lifeRatio * 25;
 
-        // Streak from previous position
-        ctx.strokeStyle = `hsla(${s.hue}, 100%, ${65 + lifeRatio * 20}%, ${a})`;
+        ctx.strokeStyle = `hsla(${s.hue}, 100%, ${light}%, ${a})`;
         ctx.lineWidth = s.size;
         ctx.lineCap = 'round';
+        ctx.shadowColor = `hsla(${s.hue}, 100%, 65%, ${a * 0.9})`;
+        ctx.shadowBlur = 10;
         ctx.beginPath();
         ctx.moveTo(s.px, s.py);
         ctx.lineTo(s.x, s.y);
         ctx.stroke();
       }
+      ctx.shadowBlur = 0;
 
       ctx.globalCompositeOperation = 'source-over';
 
@@ -272,11 +335,11 @@ export default function Fireworks({ intensity = 'high', finaleSignal = 0 }: Fire
       const now = performance.now();
       if (now - lastAuto > nextAuto) {
         lastAuto = now;
-        const high = intensityRef.current === 'high';
-        nextAuto = high ? rand(700, 1600) : rand(2600, 4800);
+        const t = tune();
+        nextAuto = rand(t.every[0], t.every[1]);
         launch();
-        if (high && Math.random() < 0.35) {
-          setTimeout(() => launch(), rand(120, 380));
+        if (intensityRef.current !== 'low' && Math.random() < 0.45) {
+          setTimeout(() => launch(), rand(110, 340));
         }
       }
 
@@ -286,15 +349,14 @@ export default function Fireworks({ intensity = 'high', finaleSignal = 0 }: Fire
     const handlePointerDown = (e: PointerEvent) => {
       if (intensityRef.current === 'off') return;
       launch(e.clientX, Math.max(e.clientY, height * 0.08));
+      // Small volley so a tap feels rewarding.
+      setTimeout(() => launch(), 140);
+      setTimeout(() => launch(), 300);
     };
 
     const handleVisibility = () => {
-      if (document.hidden) {
-        cancelAnimationFrame(raf);
-      } else {
-        cancelAnimationFrame(raf);
-        raf = requestAnimationFrame(draw);
-      }
+      cancelAnimationFrame(raf);
+      if (!document.hidden) raf = requestAnimationFrame(draw);
     };
 
     window.addEventListener('resize', resize);
@@ -302,9 +364,10 @@ export default function Fireworks({ intensity = 'high', finaleSignal = 0 }: Fire
     document.addEventListener('visibilitychange', handleVisibility);
 
     resize();
-    // Seed the scene so the background is alive immediately.
-    launch();
-    setTimeout(() => launch(), 400);
+    // Seed the sky immediately so the first paint already has fireworks.
+    launch(width * 0.3, height * 0.3);
+    setTimeout(() => launch(width * 0.7, height * 0.25), 250);
+    setTimeout(() => launch(), 600);
     raf = requestAnimationFrame(draw);
 
     return () => {

@@ -202,19 +202,19 @@ export default function App() {
     >
       <audio ref={audioRef} src="/bg_music.mp3" loop preload="auto" />
 
-      {/* Fireworks Background — subtle behind the terminal, full blast on reveal */}
-      <Fireworks
-        intensity={!fireworksEnabled || reduceMotion ? 'off' : stage === 'console' ? 'low' : 'high'}
-        finaleSignal={finaleSignal}
-      />
-
       {/* Vignette keeps the fireworks from washing out the foreground content */}
       <div
         className="absolute inset-0 pointer-events-none z-0"
         style={{
           background:
-            'radial-gradient(ellipse at 50% 45%, transparent 0%, transparent 42%, rgba(5,5,5,0.55) 78%, rgba(5,5,5,0.9) 100%)',
+            'radial-gradient(ellipse at 50% 45%, transparent 0%, transparent 45%, rgba(5,5,5,0.35) 80%, rgba(5,5,5,0.7) 100%)',
         }}
+      />
+
+      {/* Fireworks Background — sits above the vignette so the bursts stay bright */}
+      <Fireworks
+        intensity={!fireworksEnabled || reduceMotion ? 'off' : stage === 'console' ? 'medium' : 'high'}
+        finaleSignal={finaleSignal}
       />
 
       {/* Custom Mouse Cursor for Desktop */}
