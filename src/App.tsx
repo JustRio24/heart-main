@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Lock, Heart as HeartIcon, Sparkles, Volume2, VolumeX, RotateCcw } from 'lucide-react';
+import { Lock, Heart as HeartIcon, Sparkles, Volume2, VolumeX, RotateCcw, Flame } from 'lucide-react';
 import TextHeart from './components/TextHeart';
+import Fireworks from './components/Fireworks';
 
 const playTypingSound = () => {
   try {
@@ -94,6 +95,22 @@ export default function App() {
   const [mousePos, setMousePos] = useState({ x: -100, y: -100 });
   const [bursts, setBursts] = useState<BurstParticle[]>([]);
 
+  // Fireworks background: low intensity on the console stage so the terminal
+  // stays readable, full celebration once the message is revealed.
+  const [fireworksEnabled, setFireworksEnabled] = useState(true);
+  const [finaleSignal, setFinaleSignal] = useState(0);
+  const [reduceMotion, setReduceMotion] = useState(false);
+
+  useEffect(() => {
+    if (typeof window.matchMedia !== 'function') return;
+    const mq = window.matchMedia('(prefers-reduced-motion: reduce)');
+    setReduceMotion(mq.matches);
+    if (!mq.matches) return;
+    const onChange = (e: MediaQueryListEvent) => setReduceMotion(e.matches);
+    mq.addEventListener?.('change', onChange);
+    return () => mq.removeEventListener?.('change', onChange);
+  }, []);
+
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
       setMousePos({ x: e.clientX, y: e.clientY });
@@ -121,6 +138,7 @@ export default function App() {
   const handleReveal = useCallback(() => {
     if (stage === 'console' && consoleFinished) {
       setStage('reveal');
+      setFinaleSignal((n) => n + 1);
       if (audioRef.current) {
         audioRef.current.volume = 0;
         audioRef.current
@@ -184,6 +202,21 @@ export default function App() {
     >
       <audio ref={audioRef} src="/bg_music.mp3" loop preload="auto" />
 
+      {/* Fireworks Background — subtle behind the terminal, full blast on reveal */}
+      <Fireworks
+        intensity={!fireworksEnabled || reduceMotion ? 'off' : stage === 'console' ? 'low' : 'high'}
+        finaleSignal={finaleSignal}
+      />
+
+      {/* Vignette keeps the fireworks from washing out the foreground content */}
+      <div
+        className="absolute inset-0 pointer-events-none z-0"
+        style={{
+          background:
+            'radial-gradient(ellipse at 50% 45%, transparent 0%, transparent 42%, rgba(5,5,5,0.55) 78%, rgba(5,5,5,0.9) 100%)',
+        }}
+      />
+
       {/* Custom Mouse Cursor for Desktop */}
       <div
         className={`custom-cursor ${stage === 'console' ? 'cursor-console' : 'cursor-reveal'}`}
@@ -223,38 +256,55 @@ export default function App() {
         ))}
       </div>
 
-      {/* Floating Audio Control Widget */}
-      {stage === 'reveal' && (
-        <motion.div
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 1 }}
-          className="fixed top-5 right-5 z-40"
+      {/* Floating Control Cluster */}
+      <div className="fixed top-5 right-5 z-40 flex items-center gap-2">
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            setFireworksEnabled((v) => !v);
+          }}
+          title={fireworksEnabled ? 'Matikan kembang api' : 'Nyalakan kembang api'}
+          aria-label={fireworksEnabled ? 'Matikan kembang api' : 'Nyalakan kembang api'}
+          aria-pressed={fireworksEnabled}
+          className={`group flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-black/60 border backdrop-blur-md text-xs font-mono transition-all duration-300 pointer-events-auto ${
+            fireworksEnabled
+              ? 'border-pink-500/25 text-pink-soft hover:bg-pink-deep/20 shadow-[0_0_15px_rgba(255,77,109,0.2)]'
+              : 'border-white/10 text-white/40 hover:border-white/20'
+          }`}
         >
-          <button
-            onClick={toggleMusic}
-            className="group flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-black/60 hover:bg-pink-deep/20 border border-pink-500/25 backdrop-blur-md text-pink-soft text-xs font-mono transition-all duration-300 shadow-[0_0_15px_rgba(255,77,109,0.2)] pointer-events-auto"
-            title={isPlayingMusic ? "Mute Music" : "Play Music"}
-          >
-            {isPlayingMusic ? (
-              <>
-                <Volume2 size={14} className="text-pink-deep animate-pulse" />
-                <span className="text-[11px] tracking-wider uppercase hidden sm:inline">Music: On</span>
-                <span className="flex gap-0.5 items-end h-3">
-                  <span className="w-0.5 h-full bg-pink-deep animate-bounce" />
-                  <span className="w-0.5 h-2/3 bg-pink-soft animate-bounce" style={{ animationDelay: '0.15s' }} />
-                  <span className="w-0.5 h-full bg-pink-deep animate-bounce" style={{ animationDelay: '0.3s' }} />
-                </span>
-              </>
-            ) : (
-              <>
-                <VolumeX size={14} className="text-white/40" />
-                <span className="text-[11px] tracking-wider uppercase text-white/50 hidden sm:inline">Music: Off</span>
-              </>
-            )}
-          </button>
-        </motion.div>
-      )}
+          <Flame size={14} className={fireworksEnabled ? 'text-pink-deep animate-pulse' : 'text-white/30'} />
+          <span className="text-[11px] tracking-wider uppercase hidden sm:inline">
+            Fireworks: {fireworksEnabled ? 'On' : 'Off'}
+          </span>
+        </button>
+
+        {stage === 'reveal' && (
+          <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 1 }}>
+            <button
+              onClick={toggleMusic}
+              className="group flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-black/60 hover:bg-pink-deep/20 border border-pink-500/25 backdrop-blur-md text-pink-soft text-xs font-mono transition-all duration-300 shadow-[0_0_15px_rgba(255,77,109,0.2)] pointer-events-auto"
+              title={isPlayingMusic ? "Mute Music" : "Play Music"}
+            >
+              {isPlayingMusic ? (
+                <>
+                  <Volume2 size={14} className="text-pink-deep animate-pulse" />
+                  <span className="text-[11px] tracking-wider uppercase hidden sm:inline">Music: On</span>
+                  <span className="flex gap-0.5 items-end h-3">
+                    <span className="w-0.5 h-full bg-pink-deep animate-bounce" />
+                    <span className="w-0.5 h-2/3 bg-pink-soft animate-bounce" style={{ animationDelay: '0.15s' }} />
+                    <span className="w-0.5 h-full bg-pink-deep animate-bounce" style={{ animationDelay: '0.3s' }} />
+                  </span>
+                </>
+              ) : (
+                <>
+                  <VolumeX size={14} className="text-white/40" />
+                  <span className="text-[11px] tracking-wider uppercase text-white/50 hidden sm:inline">Music: Off</span>
+                </>
+              )}
+            </button>
+          </motion.div>
+        )}
+      </div>
 
       <AnimatePresence mode="wait">
         {stage === 'console' ? (
